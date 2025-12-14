@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sync/atomic"
 )
@@ -11,16 +12,36 @@ type apiConfig struct {
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
-	cfg.fileserverHits.Add(20)
-	return next
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileserverHits.Add(1)
+		next.ServeHTTP(w,r)
+	})
+}
+
+func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request){
+	fmt.Println("metrics handler called")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	hits:=cfg.fileserverHits.Load()
+	w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
+}
+		
+func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
+	cfg.fileserverHits.Store(0)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
 }
 
 func main(){
 	const filepathRoot = "."
 	const port = "8080"
 	mux := http.NewServeMux()
+	cfg := &apiConfig{}
 	
-	mux.Handle("/app/", http.StripPrefix("/app/",http.FileServer(http.Dir(filepathRoot))))
+	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app/",http.FileServer(http.Dir(filepathRoot)))))
+	mux.HandleFunc("/metrics", cfg.handlerMetrics)
+
+	mux.HandleFunc("/reset", cfg.handlerReset)
 	mux.HandleFunc("/", func(w http.ResponseWriter , req *http.Request){
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if req.Method == "OPTIONS" {
@@ -29,10 +50,10 @@ func main(){
 		bodyText:="OK"
 		w.Write([]byte(bodyText))
 	})
-	handler:=mux.Handler(&http.Request{}){
-		return http.Handler.ServeHTTP()
-	}
-	mux.Handle("/app/", cfg.middlewareMetricsInc())
+
+	// handler:=mux.Handler(&http.Request{}){
+	// 	return http.Handler.ServeHTTP()
+	// }
 	server:= &http.Server{
 		Addr: ":" +port,
 		Handler: mux,
