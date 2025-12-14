@@ -25,31 +25,22 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request){
 	w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
 }
 		
-func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
-	cfg.fileserverHits.Store(0)
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
-}
+
 
 func main(){
 	const filepathRoot = "."
 	const port = "8080"
 	mux := http.NewServeMux()
-	cfg := &apiConfig{}
+	cfg := &apiConfig{
+		fileserverHits: atomic.Int32{},
+	}
 	
 	mux.Handle("/app/", cfg.middlewareMetricsInc(http.StripPrefix("/app/",http.FileServer(http.Dir(filepathRoot)))))
+	mux.HandleFunc("/healthz", handlerReadiness)
 	mux.HandleFunc("/metrics", cfg.handlerMetrics)
 
 	mux.HandleFunc("/reset", cfg.handlerReset)
-	mux.HandleFunc("/", func(w http.ResponseWriter , req *http.Request){
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		if req.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-		}
-		bodyText:="OK"
-		w.Write([]byte(bodyText))
-	})
+	
 
 	// handler:=mux.Handler(&http.Request{}){
 	// 	return http.Handler.ServeHTTP()
