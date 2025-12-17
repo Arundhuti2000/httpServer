@@ -63,7 +63,7 @@ curl -X POST http://localhost:8080/api/reset
 
 ## Notes
 
-- The server maps `/app/` to the current working directory (`.`) so any files (for example `index.html` or the `assets/` folder) will be served there.
+- The server maps `/app/` to the current working directory (`.`) so any files (for eg `index.html` or the `assets/` folder) will be served there.
 - If you want a different port or file root, update `main.go` constants.
 
 ## License
