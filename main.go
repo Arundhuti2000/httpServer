@@ -24,6 +24,7 @@ func main(){
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 	mux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", cfg.handlerReset)
+	mux.HandleFunc("POST /api/validate_chirp", cfg.handlerValidateChirps)
 	
 
 	// handler:=mux.Handler(&http.Request{}){
