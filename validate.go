@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func writeJSONError(w http.ResponseWriter, code int, msg string) {
@@ -30,6 +31,18 @@ func (cfg *apiConfig) handlerValidateChirps(w http.ResponseWriter, r *http.Reque
         writeJSONError(w, http.StatusBadRequest, "Chirp is too long")
         return
     }
+	
+	switch(params.Body){
+	case "kerfuffle":{
+		strings.Replace(params.Body,"kerfuffle","****",3)
+	}
+	case "sharbert":{
+		strings.Replace(params.Body,"kerfuffle","****",3)
+	}
+	case "fornax":{
+		strings.Replace(params.Body,"kerfuffle","****",3)
+	}
+	}
 	type returnVals struct {
 		Valid bool `json:"valid"`
 	}
