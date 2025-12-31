@@ -7,10 +7,29 @@ import (
 	"strings"
 )
 
-func writeJSONError(w http.ResponseWriter, code int, msg string) {
+func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
+func respondWithError(w http.ResponseWriter, code int, msg string) {
+	respondWithJSON(w, code, map[string]string{"error": msg})
+}
+
+
+func cleanProfanity(s string) string {
+	banned := []string{"kerfuffle", "sharbert", "fornax"}
+	parts := strings.Split(s, " ")
+	for i, tok := range parts {
+		for _, b := range banned {
+			if strings.EqualFold(tok, b) {
+				parts[i] = "****"
+				break
+			}
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func (cfg *apiConfig) handlerValidateChirps(w http.ResponseWriter, r *http.Request) {
@@ -23,35 +42,17 @@ func (cfg *apiConfig) handlerValidateChirps(w http.ResponseWriter, r *http.Reque
 	err := decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s", err)
-		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
         return
 		
     } 
 	if len(params.Body) > 140 {
-        writeJSONError(w, http.StatusBadRequest, "Chirp is too long")
-        return
-    }
-	
-	switch(params.Body){
-	case "kerfuffle":{
-		strings.Replace(params.Body,"kerfuffle","****",3)
-	}
-	case "sharbert":{
-		strings.Replace(params.Body,"kerfuffle","****",3)
-	}
-	case "fornax":{
-		strings.Replace(params.Body,"kerfuffle","****",3)
-	}
-	}
-	type returnVals struct {
-		Valid bool `json:"valid"`
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
+		return
 	}
 
-	respBody := returnVals{Valid: true}
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(respBody); err != nil {
-        log.Printf("Error encoding response: %v", err)
-        writeJSONError(w, http.StatusInternalServerError, "Something went wrong")
-        return
-    }
+	cleaned := cleanProfanity(params.Body)
+
+	resp := map[string]string{"cleaned_body": cleaned}
+	respondWithJSON(w, http.StatusOK, resp)
 }
