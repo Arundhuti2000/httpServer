@@ -5,6 +5,9 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/Arundhuti2000/httpserver/internal/database"
+	"github.com/google/uuid"
 )
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -32,9 +35,58 @@ func cleanProfanity(s string) string {
 	return strings.Join(parts, " ")
 }
 
-func (cfg *apiConfig) handlerValidateChirps(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerchirps(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-        Body string `json:"body"`
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}
+	
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		respondWithError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	
+	// Validate chirp length
+	if len(params.Body) > 140 {
+		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
+		return
+	}
+
+	// Clean profanity
+	cleaned := cleanProfanity(params.Body)
+
+	// Create chirp in database
+	dbChirp, err := cfg.DB.CreateChirp(r.Context(), database.CreateChirpParams{
+		Body:   cleaned,
+		UserID: params.UserID,
+	})
+	if err != nil {
+		log.Printf("Error creating chirp: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't create chirp")
+		return
+	}
+
+	// Convert database.Chirp to main.Chirp for JSON response
+	chirp := Chirp{
+		ID:        dbChirp.ID,
+		CreatedAt: dbChirp.CreatedAt,
+		UpdatedAt: dbChirp.UpdatedAt,
+		Body:      dbChirp.Body,
+		UserID:    dbChirp.UserID,
+	}
+
+	respondWithJSON(w, http.StatusCreated, chirp)
+}
+
+
+
+func (cfg *apiConfig) handlerusers(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+        Email string `json:"email"`
     }
 	
 	decoder := json.NewDecoder(r.Body)
@@ -44,15 +96,24 @@ func (cfg *apiConfig) handlerValidateChirps(w http.ResponseWriter, r *http.Reque
 		log.Printf("Error decoding parameters: %s", err)
 		respondWithError(w, http.StatusBadRequest, "invalid request body")
         return
-		
     } 
-	if len(params.Body) > 140 {
-		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
+	
+	// Create user in database
+	dbUser, err := cfg.DB.CreateUser(r.Context(), params.Email)
+	if err != nil {
+		log.Printf("Error creating user: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't create user")
 		return
 	}
 
-	cleaned := cleanProfanity(params.Body)
+	// Convert database.User to main.User for JSON response
+	user := User{
+		ID:        dbUser.ID,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+		Email:     dbUser.Email,
+	}
 
-	resp := map[string]string{"cleaned_body": cleaned}
-	respondWithJSON(w, http.StatusOK, resp)
+	respondWithJSON(w, http.StatusCreated, user)
 }
+
