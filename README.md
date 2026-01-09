@@ -17,7 +17,18 @@ This server implements a Twitter-like application backend with the following key
 
 ## Prerequisites
 
-- Go (1.18+ recommended).
+- Go (1.18+ recommended)
+- PostgreSQL database
+- Environment variables configured (see below)
+
+## Configuration
+
+Create a `.env` file in the project root with:
+
+```env
+DB_URL=postgres://username:password@localhost:5432/dbname?sslmode=disable
+PLATFORM=dev
+```
 
 ## Build & Run
 
@@ -37,12 +48,78 @@ The server listens on port `8080` by default.
 
 ## Endpoints
 
-- Static files: `GET /app/<path>` — serves files from the repository root. Example: `/app/index.html`.
-- Health: `GET /api/healthz` — readiness/health endpoint.
-- Metrics: `GET /api/metrics` — returns a simple text metric (file server hit count).
-- Reset: `POST /api/reset` — resets metrics/state (if implemented).
+### Static Files
+
+- `GET /app/<path>` — Serves static files from the repository root. Example: `/app/index.html`
+
+### API Endpoints
+
+#### Health & Monitoring
+
+- `GET /api/healthz` — Health check endpoint (returns 200 OK)
+
+#### User Management
+
+- `POST /api/users` — Create a new user account
+  - Request body: `{"email": "user@example.com", "password": "securepassword"}`
+  - Returns user details (ID, email, created_at, updated_at)
+- `POST /api/login` — Authenticate user and login
+  - Request body: `{"email": "user@example.com", "password": "password"}`
+  - Returns user details upon successful authentication
+
+#### Chirp Management
+
+- `POST /api/chirps` — Create a new chirp (max 140 characters)
+  - Request body: `{"body": "Your chirp message here", "user_id": "uuid"}`
+  - Automatically filters profanity
+  - Returns created chirp details
+- `GET /api/chirps` — Retrieve all chirps
+  - Returns array of all chirps
+- `GET /api/chirps/{chirpID}` — Get a specific chirp by ID
+  - Returns single chirp details
+
+### Admin Endpoints
+
+- `GET /admin/metrics` — View server metrics (file server hit count)
+- `POST /admin/reset` — Reset all metrics and potentially clear database (dev/platform dependent)
 
 ## Examples
+
+Create a user:
+
+```bash
+curl -X POST http://localhost:8080/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "mypassword"}'
+```
+
+Login:
+
+```bash
+curl -X POST http://localhost:8080/api/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "user@example.com", "password": "mypassword"}'
+```
+
+Create a chirp:
+
+```bash
+curl -X POST http://localhost:8080/api/chirps \
+  -H "Content-Type: application/json" \
+  -d '{"body": "This is my first chirp!", "user_id": "your-user-uuid"}'
+```
+
+Get all chirps:
+
+```bash
+curl http://localhost:8080/api/chirps
+```
+
+Get specific chirp:
+
+```bash
+curl http://localhost:8080/api/chirps/{chirp-uuid}
+```
 
 Fetch index:
 
@@ -59,19 +136,31 @@ curl http://localhost:8080/api/healthz
 View metrics:
 
 ```bash
-curl http://localhost:8080/api/metrics
+curl http://localhost:8080/admin/metrics
 ```
 
 Reset metrics:
 
 ```bash
-curl -X POST http://localhost:8080/api/reset
+curl -X POST http://localhost:8080/admin/reset
 ```
 
 ## Notes
 
 - The server maps `/app/` to the current working directory (`.`) so any files (for eg `index.html` or the `assets/` folder) will be served there.
+- Passwords are hashed using Argon2id for secure storage
+- Chirps have a 140-character limit and are automatically filtered for profanity
+- The profanity filter replaces words like "kerfuffle", "sharbert", and "fornax" with "****"
+- All database operations use SQLC-generated type-safe queries
+- Users and chirps are stored in PostgreSQL with proper foreign key relationships
 - If you want a different port or file root, update `main.go` constants.
+
+## Database Schema
+
+The application uses two main tables:
+
+- **users**: Stores user accounts with email and hashed passwords
+- **chirps**: Stores user-generated chirps with references to user accounts
 
 ## License
 
