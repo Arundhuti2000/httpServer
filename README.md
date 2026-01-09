@@ -1,12 +1,19 @@
 # httpServer
 
-Minimal Go HTTP server that serves static files and a few simple API endpoints.
+A Go-based HTTP server for a social media platform featuring user authentication, chirp (short message) management, and PostgreSQL database integration. The server provides RESTful API endpoints for creating users, managing chirps (tweets-like messages), user login, and administrative functions.
 
 ## Overview
 
-- Serves files from the project root under the `/app/` prefix.
-- Exposes simple endpoints under `/api/` for health, metrics and reset.
-- Default port: `8080`.
+This server implements a Twitter-like application backend with the following key features:
+
+- **User Management**: Create user accounts with secure password hashing using Argon2id
+- **Authentication**: User login system with password verification
+- **Chirp System**: Create and retrieve short messages (chirps) with a 140-character limit
+- **Profanity Filter**: Automatic content moderation for chirps
+- **Database Integration**: PostgreSQL database with SQLC for type-safe queries
+- **Static File Serving**: Serves frontend files from the project root under `/app/`
+- **Admin Dashboard**: Metrics tracking and system reset capabilities
+- Default port: `8080`
 
 ## Prerequisites
 
