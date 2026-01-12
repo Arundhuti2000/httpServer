@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"net/http"
 	"testing"
 	"time"
 
@@ -139,7 +140,7 @@ func TestMakeJWT_DifferentUserIDs(t *testing.T) {
 func TestValidateJWT_ShortExpirationTime(t *testing.T) {
 	userID := uuid.New()
 	tokenSecret := "test-secret-key"
-	expiresIn := 100 * time.Millisecond // Very short expiration
+	expiresIn := 1 * time.Second // Short expiration
 
 	// Create a token with short expiration
 	token, err := MakeJWT(userID, tokenSecret, expiresIn)
@@ -158,11 +159,67 @@ func TestValidateJWT_ShortExpirationTime(t *testing.T) {
 	}
 
 	// Wait for token to expire
-	time.Sleep(150 * time.Millisecond)
+	time.Sleep(1100 * time.Millisecond)
 
 	// Validate again - should fail
 	_, err = ValidateJWT(token, tokenSecret)
 	if err == nil {
 		t.Error("ValidateJWT() expected error for expired token after sleep, got nil")
+	}
+}
+
+func TestGetBearerToken_ValidHeader(t *testing.T) {
+	token := "test-token-12345"
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer "+token)
+
+	extractedToken, err := GetBearerToken(headers)
+	if err != nil {
+		t.Fatalf("GetBearerToken() error = %v, want nil", err)
+	}
+
+	if extractedToken != token {
+		t.Errorf("GetBearerToken() token = %v, want %v", extractedToken, token)
+	}
+}
+
+func TestGetBearerToken_MissingHeader(t *testing.T) {
+	headers := http.Header{}
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Error("GetBearerToken() expected error for missing header, got nil")
+	}
+}
+
+func TestGetBearerToken_InvalidFormat(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Basic dXNlcjpwYXNz")
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Error("GetBearerToken() expected error for invalid format, got nil")
+	}
+}
+
+func TestGetBearerToken_MissingToken(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer")
+
+	_, err := GetBearerToken(headers)
+	if err == nil {
+		t.Error("GetBearerToken() expected error for missing token, got nil")
+	}
+}
+
+func TestGetBearerToken_ExtraSpaces(t *testing.T) {
+	token := "test-token"
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer  "+token) // Extra space
+
+	_, err := GetBearerToken(headers)
+	// This should error because the token will have a leading space
+	if err == nil {
+		t.Error("GetBearerToken() expected error for extra spaces, got nil")
 	}
 }

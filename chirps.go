@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/Arundhuti2000/httpserver/internal/auth"
 	"github.com/Arundhuti2000/httpserver/internal/database"
 	"github.com/google/uuid"
 )
@@ -15,9 +16,25 @@ func (cfg *apiConfig) handlerchirps(w http.ResponseWriter, r *http.Request) {
 		UserID uuid.UUID `json:"user_id"`
 	}
 	
+	// Extract token from Authorization header
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting bearer token: %s", err)
+		respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	// Validate JWT token
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		log.Printf("Error validating JWT: %s", err)
+		respondWithError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		log.Printf("Error decoding parameters: %s", err)
 		respondWithError(w, http.StatusBadRequest, "invalid request body")
@@ -33,10 +50,10 @@ func (cfg *apiConfig) handlerchirps(w http.ResponseWriter, r *http.Request) {
 	// Clean profanity
 	cleaned := cleanProfanity(params.Body)
 
-	// Create chirp in database
+	// Create chirp in database with the authenticated user's ID
 	dbChirp, err := cfg.DB.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 	if err != nil {
 		log.Printf("Error creating chirp: %s", err)

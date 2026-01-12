@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Arundhuti2000/httpserver/internal/auth"
 	"github.com/Arundhuti2000/httpserver/internal/database"
@@ -86,8 +87,17 @@ func (cfg *apiConfig) handlerusers(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email             string `json:"email"`
+		Password          string `json:"password"`
+		ExpiresInSeconds  *int   `json:"expires_in_seconds"`
+	}
+
+	type response struct {
+		ID        string `json:"id"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+		Email     string `json:"email"`
+		Token     string `json:"token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -115,14 +125,33 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return user without password
-	user := User{
-		ID:        dbUser.ID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-		Email:     dbUser.Email,
+	// Determine expiration time
+	expiresIn := time.Hour // Default: 1 hour
+	if params.ExpiresInSeconds != nil {
+		expiresIn = time.Duration(*params.ExpiresInSeconds) * time.Second
+		// Cap at 1 hour
+		if expiresIn > time.Hour {
+			expiresIn = time.Hour
+		}
 	}
 
-	respondWithJSON(w, http.StatusOK, user)
+	// Create JWT token
+	token, err := auth.MakeJWT(dbUser.ID, cfg.jwtSecret, expiresIn)
+	if err != nil {
+		log.Printf("Error creating JWT: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't create token")
+		return
+	}
+
+	// Return user with token
+	resp := response{
+		ID:        dbUser.ID.String(),
+		CreatedAt: dbUser.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: dbUser.UpdatedAt.Format(time.RFC3339),
+		Email:     dbUser.Email,
+		Token:     token,
+	}
+
+	respondWithJSON(w, http.StatusOK, resp)
 }
 
