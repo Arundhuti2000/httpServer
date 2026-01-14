@@ -87,17 +87,17 @@ func (cfg *apiConfig) handlerusers(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email             string `json:"email"`
-		Password          string `json:"password"`
-		ExpiresInSeconds  *int   `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	type response struct {
-		ID        string `json:"id"`
-		CreatedAt string `json:"created_at"`
-		UpdatedAt string `json:"updated_at"`
-		Email     string `json:"email"`
-		Token     string `json:"token"`
+		ID           string `json:"id"`
+		CreatedAt    string `json:"created_at"`
+		UpdatedAt    string `json:"updated_at"`
+		Email        string `json:"email"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -125,33 +125,45 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine expiration time
-	expiresIn := time.Hour // Default: 1 hour
-	if params.ExpiresInSeconds != nil {
-		expiresIn = time.Duration(*params.ExpiresInSeconds) * time.Second
-		// Cap at 1 hour
-		if expiresIn > time.Hour {
-			expiresIn = time.Hour
-		}
-	}
-
-	// Create JWT token
-	token, err := auth.MakeJWT(dbUser.ID, cfg.jwtSecret, expiresIn)
+	// Create JWT token that expires in 1 hour
+	token, err := auth.MakeJWT(dbUser.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		log.Printf("Error creating JWT: %s", err)
 		respondWithError(w, http.StatusInternalServerError, "couldn't create token")
 		return
 	}
 
-	// Return user with token
+	// Create refresh token
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		log.Printf("Error creating refresh token: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't create refresh token")
+		return
+	}
+
+	// Store refresh token in database with 60-day expiration
+	_, err = cfg.DB.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    dbUser.ID,
+		ExpiresAt: time.Now().Add(60 * 24 * time.Hour),
+	})
+	if err != nil {
+		log.Printf("Error storing refresh token: %s", err)
+		respondWithError(w, http.StatusInternalServerError, "couldn't create refresh token")
+		return
+	}
+
+	// Return user with tokens
 	resp := response{
-		ID:        dbUser.ID.String(),
-		CreatedAt: dbUser.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: dbUser.UpdatedAt.Format(time.RFC3339),
-		Email:     dbUser.Email,
-		Token:     token,
+		ID:           dbUser.ID.String(),
+		CreatedAt:    dbUser.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    dbUser.UpdatedAt.Format(time.RFC3339),
+		Email:        dbUser.Email,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 
 	respondWithJSON(w, http.StatusOK, resp)
 }
+
 

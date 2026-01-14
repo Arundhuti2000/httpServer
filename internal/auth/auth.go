@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -83,4 +85,17 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	return parts[1], nil
+}// MakeRefreshToken generates a random 256-bit (32-byte) hex-encoded string
+func MakeRefreshToken() (string, error) {
+// Create a byte slice to hold 32 bytes (256 bits) of random data
+tokenBytes := make([]byte, 32)
+
+// Generate random bytes using crypto/rand
+_, err := rand.Read(tokenBytes)
+if err != nil {
+return "", err
+}
+
+// Convert to hex string
+return hex.EncodeToString(tokenBytes), nil
 }
