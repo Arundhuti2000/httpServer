@@ -85,7 +85,26 @@ func GetBearerToken(headers http.Header) (string, error) {
 	}
 
 	return parts[1], nil
-}// MakeRefreshToken generates a random 256-bit (32-byte) hex-encoded string
+}
+
+// GetAPIKey extracts the API key from the Authorization header
+// It expects the header value to be in the format: "ApiKey THE_KEY_HERE"
+func GetAPIKey(headers http.Header) (string, error) {
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("no authorization header provided")
+	}
+
+	// Split the header value by space
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "ApiKey" {
+		return "", errors.New("invalid authorization header format")
+	}
+
+	return parts[1], nil
+}
+
+// MakeRefreshToken generates a random 256-bit (32-byte) hex-encoded string
 func MakeRefreshToken() (string, error) {
 // Create a byte slice to hold 32 bytes (256 bits) of random data
 tokenBytes := make([]byte, 32)

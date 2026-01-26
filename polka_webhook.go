@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Arundhuti2000/httpserver/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -17,9 +18,20 @@ type PolkaWebhookRequest struct {
 }
 
 func (cfg *apiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request) {
+	// Validate API key
+	apiKey, err := GetAPIKeyFromHeaders(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	var req PolkaWebhookRequest
 	decoder := json.NewDecoder(r.Body)
-	err := decoder.Decode(&req)
+	err = decoder.Decode(&req)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid request payload")
 		return
@@ -43,4 +55,8 @@ func (cfg *apiConfig) handlerPolkaWebhook(w http.ResponseWriter, r *http.Request
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+// GetAPIKeyFromHeaders extracts the API key from the Authorization header
+func GetAPIKeyFromHeaders(headers http.Header) (string, error) {
+	return auth.GetAPIKey(headers)
 }

@@ -21,6 +21,7 @@ type apiConfig struct {
 	DB *database.Queries
 	Platform string
 	jwtSecret string
+	polkaKey string
 }
 
 type User struct {
@@ -44,6 +45,7 @@ func main(){
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	jwtSecret := os.Getenv("JWT_SECRET")
+	polkaKey := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbURL)
 	if err !=nil{
 		log.Fatal(err)
@@ -57,6 +59,7 @@ func main(){
 		DB: dbQueries,
 		Platform: platform,
 		jwtSecret: jwtSecret,
+		polkaKey: polkaKey,
 	}
 	
 	fileserverhandler:=cfg.middlewareMetricsInc(http.StripPrefix("/app/",http.FileServer(http.Dir(filepathRoot))))
