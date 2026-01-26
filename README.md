@@ -1,19 +1,37 @@
-# httpServer
+# Chirpy
 
-A Go-based HTTP server for a social media platform featuring user authentication, chirp (short message) management, and PostgreSQL database integration. The server provides RESTful API endpoints for creating users, managing chirps (tweets-like messages), user login, and administrative functions.
+A RESTful HTTP server for a Twitter-like social media platform built with Go and PostgreSQL.
 
-## Overview
+## What It Does
 
-This server implements a Twitter-like application backend with the following key features:
+Chirpy is a lightweight social media API that allows users to:
 
-- **User Management**: Create user accounts with secure password hashing using Argon2id
-- **Authentication**: User login system with password verification
-- **Chirp System**: Create and retrieve short messages (chirps) with a 140-character limit
-- **Profanity Filter**: Automatic content moderation for chirps
-- **Database Integration**: PostgreSQL database with SQLC for type-safe queries
-- **Static File Serving**: Serves frontend files from the project root under `/app/`
-- **Admin Dashboard**: Metrics tracking and system reset capabilities
-- Default port: `8080`
+- **Create and manage user accounts** with secure password hashing (Argon2id)
+- **Post short messages** (chirps) up to 140 characters with automatic profanity filtering
+- **Authenticate securely** using JWT tokens with refresh token support
+- **Upgrade to premium** (Chirpy Red) through webhook integration with Polka payment processor
+- **Browse and filter chirps** by author and sort order (ascending/descending)
+- **Manage personal chirps** with full CRUD operations
+
+## Why You Should Care
+
+This project demonstrates:
+
+- **RESTful API Design**: Clean, organized HTTP endpoints following REST principles
+- **Database Integration**: Using PostgreSQL with SQLC for type-safe queries
+- **Authentication & Authorization**: JWT-based auth with access and refresh tokens
+- **Security Best Practices**: Argon2id password hashing, API key validation, token-based auth
+- **Webhook Integration**: Handling third-party payment webhooks with API key verification
+- **Modern Go Practices**: Standard library HTTP server, context usage, proper error handling
+
+## Tech Stack
+
+- **Language**: Go
+- **Database**: PostgreSQL
+- **Auth**: JWT (golang-jwt/jwt), Argon2id password hashing
+- **Database Migrations**: SQL schema files
+- **Query Generation**: SQLC for type-safe SQL
+- **Environment Config**: godotenv
 
 ## Prerequisites
 
@@ -21,67 +39,94 @@ This server implements a Twitter-like application backend with the following key
 - PostgreSQL database
 - Environment variables configured (see below)
 
-## Configuration
+## Installation & Setup
 
-Create a `.env` file in the project root with:
+### Prerequisites
 
-```env
-DB_URL=postgres://username:password@localhost:5432/dbname?sslmode=disable
-PLATFORM=dev
-```
+- Go 1.23 or higher
+- PostgreSQL 12 or higher
+- SQLC (for regenerating database queries)
 
-## Build & Run
+### Steps
 
-From the project root:
+1. **Clone the repository**
 
-```bash
-# Run without building
-go run .
+   ```bash
+   git clone <your-repo-url>
+   cd httpServer
+   ```
 
-# Build and run
-go build -o httpserver .
-./httpserver    # Unix
-.\httpserver.exe # Windows
-```
+2. **Set up PostgreSQL database**
 
-The server listens on port `8080` by default.
+   ```bash
+   createdb chirpy
+   ```
 
-## Endpoints
+3. **Run database migrations**
+
+   ```bash
+   psql -d chirpy -f sql/schema/001_users.sql
+   psql -d chirpy -f sql/schema/002_chirps.sql
+   psql -d chirpy -f sql/schema/003_users_hashed_password.sql
+   psql -d chirpy -f sql/schema/004_refresh_tokens.sql
+   psql -d chirpy -f sql/schema/005_chirpy_red.sql
+   ```
+
+4. **Configure environment variables**
+
+   Create a `.env` file in the root directory:
+
+   ```env
+   DB_URL="postgres://postgres:postgres@localhost:5432/chirpy?sslmode=disable"
+   PLATFORM="dev"
+   JWT_SECRET="your-secret-key-here"
+   POLKA_KEY="your-polka-api-key"
+   ```
+
+5. **Install dependencies**
+
+   ```bash
+   go mod download
+   ```
+
+6. **Run the server**
+
+   ```bash
+   go build -o httpserver && ./httpserver
+   ```
+
+   The server will start on `http://localhost:8080`
+
+## API Endpoints
+
+### Health & Metrics
+
+- `GET /api/healthz` - Health check
+- `GET /admin/metrics` - Server metrics
+- `POST /admin/reset` - Reset database (dev only)
+
+### Users
+
+- `POST /api/users` - Create a new user
+- `PUT /api/users` - Update user information (authenticated)
+- `POST /api/login` - Login and receive JWT tokens
+- `POST /api/refresh` - Refresh access token
+- `POST /api/revoke` - Revoke refresh token
+
+### Chirps
+
+- `POST /api/chirps` - Create a new chirp (authenticated)
+- `GET /api/chirps` - Get all chirps (supports `?author_id=<uuid>` and `?sort=asc|desc`)
+- `GET /api/chirps/{chirpID}` - Get a specific chirp
+- `DELETE /api/chirps/{chirpID}` - Delete your own chirp (authenticated)
+
+### Webhooks
+
+- `POST /api/polka/webhooks` - Polka payment webhook (requires API key)
 
 ### Static Files
 
-- `GET /app/<path>` — Serves static files from the repository root. Example: `/app/index.html`
-
-### API Endpoints
-
-#### Health & Monitoring
-
-- `GET /api/healthz` — Health check endpoint (returns 200 OK)
-
-#### User Management
-
-- `POST /api/users` — Create a new user account
-  - Request body: `{"email": "user@example.com", "password": "securepassword"}`
-  - Returns user details (ID, email, created_at, updated_at)
-- `POST /api/login` — Authenticate user and login
-  - Request body: `{"email": "user@example.com", "password": "password"}`
-  - Returns user details upon successful authentication
-
-#### Chirp Management
-
-- `POST /api/chirps` — Create a new chirp (max 140 characters)
-  - Request body: `{"body": "Your chirp message here", "user_id": "uuid"}`
-  - Automatically filters profanity
-  - Returns created chirp details
-- `GET /api/chirps` — Retrieve all chirps
-  - Returns array of all chirps
-- `GET /api/chirps/{chirpID}` — Get a specific chirp by ID
-  - Returns single chirp details
-
-### Admin Endpoints
-
-- `GET /admin/metrics` — View server metrics (file server hit count)
-- `POST /admin/reset` — Reset all metrics and potentially clear database (dev/platform dependent)
+- `GET /app/<path>` - Serves static files from the project root
 
 ## Examples
 
@@ -150,18 +195,55 @@ curl -X POST http://localhost:8080/admin/reset
 - The server maps `/app/` to the current working directory (`.`) so any files (for eg `index.html` or the `assets/` folder) will be served there.
 - Passwords are hashed using Argon2id for secure storage
 - Chirps have a 140-character limit and are automatically filtered for profanity
-- The profanity filter replaces words like "kerfuffle", "sharbert", and "fornax" with "****"
+- The profanity filter replaces words like "kerfuffle", "sharbert", and "fornax" with "\*\*\*\*"
 - All database operations use SQLC-generated type-safe queries
 - Users and chirps are stored in PostgreSQL with proper foreign key relationships
 - If you want a different port or file root, update `main.go` constants.
 
 ## Database Schema
 
-The application uses two main tables:
+Project Structure
 
-- **users**: Stores user accounts with email and hashed passwords
-- **chirps**: Stores user-generated chirps with references to user accounts
+```
+httpServer/
+├── internal/
+│   ├── auth/          # Authentication utilities (JWT, password hashing, API keys)
+│   └── database/      # SQLC generated database code
+├── sql/
+│   ├── queries/       # SQL queries for SQLC
+│   └── schema/        # Database migration files
+├── assets/            # Static assets
+├── main.go            # Server entry point
+├── *.go               # HTTP handlers
+├── .env               # Environment configuration
+└── go.mod             # Go module dependencies
+```
+
+## Development
+
+To regenerate database queries after modifying SQL files:
+
+```bash
+sqlc generate
+```
+
+## Database Schema
+
+The application uses the following main tables:
+
+- **users**: User accounts with email, hashed passwords, and Chirpy Red status
+- **chirps**: User-generated chirps with references to user accounts
+- **refresh_tokens**: JWT refresh tokens for authentication
+
+## Notes
+
+- The server maps `/app/` to the current working directory (`.`)
+- Passwords are hashed using Argon2id for secure storage
+- Chirps have a 140-character limit and are automatically filtered for profanity
+- All database operations use SQLC-generated type-safe queries
+- JWT tokens expire after 1 hour; refresh tokens are valid for 60 days
+- Polka webhooks require API key authentication
 
 ## License
 
-This project has no license; add one if you plan to publish.
+This project was built as part of a learning exercise
